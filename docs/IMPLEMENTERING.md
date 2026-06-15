@@ -20,8 +20,9 @@
 10. [Feilhåndtering — krav til robusthet](#10-feilhåndtering--krav-til-robusthet)
 11. [Cache-strategi for FHIR-data](#11-cache-strategi-for-fhir-data)
 12. [Proxy-sikkerhet og audit logging](#12-proxy-sikkerhet-og-audit-logging)
-13. [Teststrategi](#13-teststrategi)
-14. [Referanser og inspirasjonskilder](#14-referanser-og-inspirasjonskilder)
+13. [Teststrategi og testmiljøer](#13-teststrategi)
+14. [HelseID-integrasjon: kom i gang](#14-helseid-integrasjon-kom-i-gang)
+15. [Referanser og inspirasjonskilder](#15-referanser-og-inspirasjonskilder)
 
 ---
 
@@ -620,9 +621,105 @@ _logger.LogInformation(
 // Aldri log fnr eller annet pasientidentifiserende i klartekst
 ```
 
+### Digdir-kapabiliteter og helsesektorens tilsvarende løsninger
+
+Altinn Studio er bygget på Digdirs fellesløsninger. Tabellen under viser relevansen for dette prosjektet og hva helsesektoren tilbyr som tilsvarende mekanismer.
+
+#### Maskinporten
+
+OAuth2 `client_credentials` for system-til-system-kommunikasjon uten bruker. Relevant dersom EPJ-leverandøren krever at Altinn-appen er pre-registrert som godkjent API-konsument — utover SMART-tokenet som identifiserer brukeren.
+
+**Helsesektorens tilsvarende:** HelseID `client_credentials` grant type — identisk konsept, men administrert av NHN og begrenset til godkjente helsevirksomheter.
+
+#### Altinn Autorisasjon
+
+Altinns system for roller, rettigheter og delegering — hvem kan gjøre hva på vegne av hvem. I produksjon bør Altinn Autorisasjon brukes til å kontrollere at legen har rett til å sende inn legeerklæringen på vegne av pasienten.
+
+**Helsesektorens tilsvarende — to lag:**
+
+| Mekanisme | Hva den kontrollerer |
+|---|---|
+| HPR-autorisasjon | Hvem som er autorisert helsepersonell og for hvilke handlinger |
+| NHN Tillitsrammeverk | Hvem som har tilgang til hvilke helsedata basert på behandlingsrelasjon og formål |
+
+Tillitsrammeverket bæres som claims i HelseID-tokenet og er særlig relevant for at EPJ skal kunne ta en informert tilgangsbeslutning. Relevante claims fra TTT-modellen:
+
+```
+PractitionerAuthorizationCode    → autorisasjonstype (f.eks. "LE" for lege)
+CareRelationshipPurposeOfUseCode → formål med datatilgangen
+CareRelationshipHealthcareServiceCode → helsetjenestetype
+PractitionerLegalEntityId        → virksomhetens org.nr.
+```
+
+**Viktig:** Altinn Autorisasjon og NHN Tillitsrammeverk er *komplementære*, ikke konkurrerende. Altinn kontrollerer skjemainnsendingen; Tillitsrammeverk kontrollerer FHIR-datatilgangen fra EPJ. Et produksjonssystem trenger begge.
+
+#### Ressursregisteret
+
+Altinns katalog over beskyttede ressurser. I produksjon bør "legeerklæring for førerrett" registreres her slik at Altinn Autorisasjon kan håndheve tilgangsstyringen formelt.
+
+**Helsesektorens tilsvarende:** NHN selvbetjeningsportal (`selvbetjening.nhn.no`) — EPJ-leverandører registrerer API-er og konsumenter søker tilgang.
+
+#### Prioritering
+
+| Kapabilitet | PoC | TT02 | Produksjon |
+|---|---|---|---|
+| Maskinporten / HelseID client_credentials | Nei | Vurder | Avhenger av EPJ |
+| Altinn Autorisasjon | Nei | Nei | **Ja** |
+| NHN Tillitsrammeverk (claims i HelseID-token) | Nei | Ja | **Ja** |
+| Ressursregisteret | Nei | Nei | **Ja** |
+
 ---
 
 ## 13. Teststrategi
+
+### Testmiljøer og testdata — oversikt
+
+Det finnes tre relevante miljøer med ulik testdata-infrastruktur. Testdata må henge **konsistent sammen** på tvers av alle systemer: fnr som brukes i Altinn-innlogging må finnes i Folkeregisteret test, i HelseID, i SyntPop og i FHIR-dataene.
+
+| Miljø | Altinn | ID-porten | HelseID | FHIR/EPJ | Testdata-kilde |
+|---|---|---|---|---|---|
+| **Lokalt** | Local Test (port 8000) | Mocket (ingen) | SMART mock | HAPI FHIR lokal | Hardkodet i `seed.ps1` |
+| **TT02** | `tt02.altinn.no` | ID-porten test | HelseID test | EPJ-leverandørens testsystem | **Tenor** (Skatteetaten) + **SyntPop** (NHN) |
+| **Produksjon** | `altinn.no` | ID-porten prod | HelseID prod | EPJ prod | Ekte data |
+
+#### Tenor — nasjonal testdata-infrastruktur
+
+**Tenor** er Skatteetatens søkeverktøy for å finne syntetiske testpersoner som fungerer i *alle nasjonale testmiljøer*. Tenor-personene er synkronisert med:
+
+- **ID-porten test** — kan logge inn som hvilken som helst Tenor-person via syntetisk fnr
+- **Folkeregisteret test (FREG)** — Tenor-fnr finnes her og er gyldige
+- **Altinn TT02** — bruker samme identitetsinfrastruktur som ID-porten test
+- **HelseID test** — TestIDP og TTT bruker Tenor-kompatible fnr
+
+SyntPop bygger videre på Tenor-populasjonen og legger til HPR- og FLR-data. En person med fnr X i Tenor er den **samme personen** i SyntPop, ID-porten test og Altinn TT02.
+
+#### Konsistenskrav ved TT02-overgang
+
+```
+Tenor-person (fnr = T)
+    │
+    ├─► ID-porten test → logger inn i Altinn TT02 med fnr T
+    │
+    ├─► HelseID test (TTT/TestIDP) → token med pid = T
+    │
+    ├─► SyntPop → person med fnr T har HPR-nummer H og FLR-tilknytning
+    │
+    └─► FHIR (EPJ testsystem) → Practitioner.identifier.value = T
+                                 Patient.identifier.value = pasientens fnr
+
+Alle systemer må bruke SAMME fnr for SAMME person.
+```
+
+**Praktisk prosess for TT02-overgang:**
+
+1. Finn en syntetisk lege i **SyntPop** med HPR-nummer og aktiv fastlegeavtale
+2. Hent legens fnr — dette er også Tenor-fnr, gyldig i ID-porten test
+3. Finn en pasient i SyntPop via `GET /api/flr/doctor/{hprnr}` — pasienter på denne legens liste
+4. Oppdater `seed.ps1` med de faktiske fnr/HPR-numrene
+5. Bruk legens fnr i HelseID TTT-token (`Pid` + `HprNumber`)
+6. Logg inn i Altinn TT02 med legens fnr via ID-porten test
+
+**Merk om Tenor-tilgang:** Tenor søke-UI er tilgjengelig på `https://tenor.skatteetaten.no/` (krever innlogging). Alternativt finnes Tenor-kompatible testpersoner via Skatteetatens test-API og via SyntPop.
 
 ### Lokalt (PoC)
 
@@ -640,6 +737,42 @@ _logger.LogInformation(
 | Inferno Test Suite | https://inferno.healthit.gov/ | Sertifiseringstesting av SMART App Launch-klienter |
 | HAPI FHIR public | https://hapi.fhir.org/baseR4 | Offentlig FHIR R4-testserver |
 
+### TT02-overgang: sjekkliste
+
+Når PoC skal flyttes fra Local Test til TT02, må disse stegene gjennomføres **i denne rekkefølgen** fordi alle systemer må bruke konsistente testpersoner:
+
+- [ ] **1. Velg syntetisk lege i SyntPop**
+  - Logg inn på `syntpop.nhn.no` med HelseID (testmiljø)
+  - Søk: `POST /api/search { "hpr": { "isGP": true }, "flr": { "hasGP": true } }`
+  - Velg lege med HPR-godkjenning i allmennmedisin og aktive FLR-pasienter
+  - Noter: `fnr_lege`, `hpr_nummer`, `navn`
+
+- [ ] **2. Finn en pasient på legens liste**
+  - `GET /api/flr/doctor/{hpr_nummer}` → liste over pasienter
+  - Velg én pasient: noter `fnr_pasient`, `navn`
+
+- [ ] **3. Verifiser at fnr er Tenor-kompatible**
+  - Søk på `tenor.skatteetaten.no` — bekreft at begge fnr finnes der
+  - Disse fnr-ene er gyldige i ID-porten test og Altinn TT02
+
+- [ ] **4. Oppdater FHIR-testdata**
+  - Oppdater `seed.ps1` (eller nytt TT02-seed-script) med ekte Tenor-fnr
+  - Practitioner: `fnr = fnr_lege`, HPR-nummer = `hpr_nummer`
+  - Patient: `fnr = fnr_pasient`
+  - Behold samme FHIR-ressurs-IDer (`lege-ola`, `sophie-salt`) om mulig
+
+- [ ] **5. Konfigurer HelseID TTT**
+  - Generer TTT-token med `Pid = fnr_lege`, `HprNumber = hpr_nummer`
+  - API-nøkkel fra `selvbetjening.test.nhn.no`
+
+- [ ] **6. Test Altinn TT02-innlogging**
+  - Logg inn via ID-porten test med `fnr_lege`
+  - Bekreft at Altinn TT02 kjenner igjen personen og gir tilgang til appen
+
+- [ ] **7. Deploy app til TT02**
+  - `altinn studio deploy` til TT02-miljøet
+  - Oppdater `appsettings.json` med TT02-endepunkter og HelseID test-issuer
+
 ### Testscenarioer som bør dekkes
 
 | Scenario | Prioritet |
@@ -653,13 +786,170 @@ _logger.LogInformation(
 | EPJ returnerer smalere scope enn forespurt | Høy |
 | CapabilityStatement mangler SMART-extensions | Medium |
 
-### Syntetiske pasienter
+### Syntetiske pasienter og leger fra NHN SyntPop
 
-For testing mot SMARTHealthIT og Inferno: bruk syntetiske testpasienter fra [Synthea](https://github.com/synthetichealth/synthea). For norske OID-er: bruk testfødselsnummer fra Skatteetaten testdataregister.
+**SyntPop** (`syntpop.nhn.no`) er NHNs syntetiske befolkningsregister — en komplett testversjon av folkeregisteret, HPR (Helsepersonellregisteret) og FLR (Fastlegeregisteret) med realistiske syntetiske fnr-er og HPR-numre. Dataene er ikke tilknyttet ekte personer.
+
+API: `https://api.syntpop.nhn.no/` (krever HelseID- eller Azure AD-autentisering)
+
+Relevante endepunkter for legeerklæring-scenariet:
+
+| Endepunkt | Beskrivelse |
+|---|---|
+| `GET /api/persons` + `POST /api/search` | Søk etter syntetiske pasienter med filter |
+| `GET /api/flr/patient/{nin}` | Slå opp en pasients fastlege (returnerer fastlegens HPR-nummer) |
+| `GET /api/flr/doctor/{hprnr}` | Slå opp alle pasienter knyttet til en lege |
+| `GET /api/hpr/persons/hprNr:{hprNr}/raw` | Rådata for helsepersonell: spesialitet, autorisasjoner |
+
+#### Typisk arbeidsflyt for testdataforberedelse
+
+```
+1. Logg inn i SyntPop med HelseID (testmiljø)
+2. Søk etter pasient med hasGP=true og ønsket kjønn/alder
+   POST /api/search { "flr": { "hasGP": true } }
+3. Hent pasientens fastlege:
+   GET /api/flr/patient/{pasientFnr}  →  { gpHprNr: [1234567] }
+4. Hent legedetaljer:
+   GET /api/hpr/persons/hprNr:1234567/raw  →  navn, spesialitet, autorisasjoner
+5. Bruk dataene til å:
+   a) Oppdatere seed.ps1 med realistisk syntetisk pasient + lege
+   b) Generere HelseID TTT-token med matching pid + hpr_number
+```
+
+#### FLR-data gir realistisk fastlege-relasjon
+
+FLR (Fastlegeregisteret) linker pasient ↔ fastlege direkte. `AzureFlrIndex`-skjemaet inneholder:
+- `gpHprNr[]` — HPR-numre til legens kontrakt
+- `hasGP` — om pasienten har registrert fastlege
+- `primaryHealthcareTeamId` — til-team-tilknytning
+
+Dette gir et mer realistisk testscenario enn hardkodede verdier, særlig ved fremtidig testing mot NHNs FHIR-API der fastlegeforholdet valideres.
+
+#### Kobling til HelseID Test Token Service
+
+Kombinert med TTT (se seksjon 14) kan SyntPop-data brukes til å generere et komplett testsett:
+
+```
+SyntPop pasient: fnr = 13085012345, navn = "Kari Olsen"
+SyntPop lege:    HPR = 7654321, navn = "Per Hansen", spesialitet = Allmennmedisin
+
+→ FHIR seed: Patient/kari-olsen + Practitioner/per-hansen + PractitionerRole
+→ HelseID TTT: { Pid: "01017512345", HprNumber: "7654321", Name: "Per Hansen" }
+→ Altinn testbruker: fnr = 01017512345 (OlaNordmann i Local Test)
+```
+
+#### Merk: SyntPop er ikke en FHIR-server
+
+Data fra SyntPop må konverteres til FHIR-ressurser og PUT inn i HAPI FHIR manuelt (via seed-script). Det er ingen direkte FHIR-integrasjon. På sikt kan seed-scriptet oppdateres til å hente data fra SyntPop API automatisk.
+
+For globalt tilgjengelige syntetiske pasienter (ikke norsk): [Synthea](https://github.com/synthetichealth/synthea) genererer FHIR R4-bundles direkte.
 
 ---
 
-## 14. Referanser og inspirasjonskilder
+## 14. HelseID-integrasjon: kom i gang
+
+### Bakgrunn
+
+HelseID autentiserer helsepersonell via ID-porten og beriker identiteten med helsefaglige claims (HPR-nummer, assurance-nivå, organisasjonstilknytning). Siden HelseID bruker ID-porten som identitetsrot, er `pid`-claimet (fnr) identisk med det Altinn mottar ved normal ID-porten-innlogging. SSO oppnås dermed via felles `pid` — ingen ny plattformavtale er nødvendig.
+
+Testmiljøet (`selvbetjening.test.nhn.no`) er tilgjengelig uten formell leverandøravtale med NHN — du logger inn med ID-porten og registrerer klient selv.
+
+### Steg 1: Registrer klient i HelseID testmiljø
+
+1. Gå til `https://selvbetjening.test.nhn.no/`
+2. Logg inn med din ID-porten-identitet
+3. Opprett ny klient med disse verdiene:
+
+| Felt | Verdi |
+|---|---|
+| Redirect URI | `http://localhost:5005/smart/helseid-callback` |
+| Scopes | `openid profile helseid://scopes/identity/pid helseid://scopes/hpr/hpr_number helseid://scopes/identity/assurance_level` |
+| Grant type | `authorization_code` |
+| Auth method | `private_key_jwt` |
+
+4. Generer JWK-nøkkelpar (RS256). Last ned privat nøkkel — lagres i `appsettings.Development.json` (aldri i git)
+
+### Steg 2: Konfigurer app
+
+```json
+// appsettings.Development.json
+{
+  "HelseID": {
+    "Authority": "https://helseid-sts.test.nhn.no",
+    "ClientId": "<din-klient-id>",
+    "PrivateKeyJwk": "<din-private-nøkkel-som-JWK-json>"
+  }
+}
+```
+
+### Steg 3: Token-validering i BFF
+
+Legg til NuGet-pakke:
+```
+dotnet add package Microsoft.AspNetCore.Authentication.JwtBearer
+```
+
+Legg til i `Program.cs`:
+```csharp
+builder.Services.AddAuthentication()
+    .AddJwtBearer("helseid", options =>
+    {
+        options.Authority = builder.Configuration["HelseID:Authority"];
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = "https://helseid-sts.test.nhn.no",
+            ValidateAudience = false,
+            NameClaimType = "helseid://claims/identity/pid"
+        };
+    });
+```
+
+### Steg 4: Ekstraher claims i SmartLaunchController
+
+```csharp
+// Etter validering av HelseID-token:
+var pid = principal.FindFirst("helseid://claims/identity/pid")?.Value;
+var hprNumber = principal.FindFirst("helseid://scopes/hpr/hpr_number")?.Value;
+var assuranceLevel = principal.FindFirst("helseid://claims/identity/assurance_level")?.Value;
+
+// Synkroniser med Altinn-sesjon:
+var altinnPid = HttpContext.User.FindFirst("urn:altinn:userid")?.Value;
+if (pid != altinnPid)
+{
+    // Advarsel: HelseID-identity matcher ikke Altinn-sesjon
+    _logger.LogWarning("HelseID pid {HelseIdPid} != Altinn pid {AltinnPid}", pid, altinnPid);
+}
+
+// Lagre i session for prefill:
+session.SetString("LegerHprNummer", hprNumber ?? string.Empty);
+```
+
+### Steg 5: TestIDP for simulert brukerinnlogging
+
+HelseID testmiljø har en "TestIDP" som lar deg simulere innlogging uten ekte testbrukere:
+- Velg TestIDP på innloggingsskjermen
+- Velg en testperson med HPR-nummer
+- Tokenet inneholder `pid` og `hpr_number` som i produksjon
+
+Se ferdigkonfigurerte eksempler: [NorskHelsenett/HelseID.Samples](https://github.com/NorskHelsenett/HelseID.Samples)
+
+### Claims-kart
+
+| HelseID-claim | Skjemafelt | OID / FHIR |
+|---|---|---|
+| `helseid://claims/identity/pid` | (synk-nøkkel) | `urn:oid:2.16.578.1.12.4.1.4.1` |
+| `helseid://scopes/hpr/hpr_number` | `LegeHprNummer` | `urn:oid:2.16.578.1.12.4.1.4.4` |
+| `name` | `LegeNavn` | — |
+| `helseid://claims/identity/assurance_level` | (validering) | — |
+
+### DPoP i produksjon
+
+Produksjonsmiljøet krever DPoP (Demonstrating Proof-of-Possession) — et ekstra lag som binder access token til nøkkelpar og forhindrer replay-angrep. HelseID.Samples-repoet viser implementasjon. DPoP er ikke nødvendig i testmiljøet.
+
+---
+
+## 15. Referanser og inspirasjonskilder
 
 ### Standarder og spesifikasjoner
 
@@ -687,6 +977,16 @@ For testing mot SMARTHealthIT og Inferno: bruk syntetiske testpasienter fra [Syn
 | app-localtest | Lokalt testmiljø (docker-compose, nginx, Altinn Platform) | https://github.com/Altinn/app-localtest |
 | Altinn App API 8.6.4 | NuGet-pakker brukt i prosjektet (Altinn.App.Core, Altinn.App.Api) | https://www.nuget.org/packages/Altinn.App.Core |
 | Altinn Studio URL-parametere | Dokumentasjon om query params og prefill via URL | https://docs.altinn.studio/altinn-studio/reference/ux/fields/prefill/ |
+
+### HelseID
+
+| Kilde | Beskrivelse | URL |
+|---|---|---|
+| HelseID utviklerportal | Dokumentasjon, protokoller, sikkerhetsprofil | https://utviklerportal.nhn.no/informasjonstjenester/helseid/ |
+| HelseID selvbetjening test | Klientregistrering uten formell avtale | https://selvbetjening.test.nhn.no/ |
+| HelseID testmiljø OIDC | Discovery-dokument for testmiljø | https://helseid-sts.test.nhn.no/.well-known/openid-configuration |
+| NorskHelsenett/HelseID.Samples | Offisielle kodeeksempler (ASP.NET Core, BFF, token exchange, DPoP) | https://github.com/NorskHelsenett/HelseID.Samples |
+| NHN SyntPop | Syntetisk befolkningsregister med HPR og FLR — realistiske testnr/HPR uten ekte personer | https://syntpop.nhn.no/ |
 
 ### Verktøy og biblioteker
 
