@@ -367,6 +367,8 @@ namespace Altinn.App.Controllers
             public string RefreshToken { get; set; }
             public string Patient { get; set; }
             public string Encounter { get; set; }
+            // Per SMART App Launch IG v2.2.0: fhirUser er et eget toppnivåfelt i tokenresponsen.
+            // Noen EPJ-systemer returnerer det som JWT-claim i access_token i stedet — dekod da tokenet server-side.
             public string FhirUser { get; set; }
         }
 

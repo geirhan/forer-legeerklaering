@@ -61,6 +61,8 @@ EPJ → SMART Launch → Altinn App → FHIR API → Prefill → Skjema → Inns
 
 **Nøkkelprinsipp:** FHIR brukes **utelukkende til forhåndsutfylling**. Altinns datamodell og innsendingsmekanisme er uendret. Access token lagres **aldri** i nettleseren — kun server-side i ASP.NET Core session.
 
+**BFF-mønster (Backend For Frontend):** Altinn-appen fungerer som konfidensielt klient og mellomlag. All token-utveksling skjer server-side; nettleseren ser aldri access token. FHIR-kall gjøres server-side med Bearer token. Dette er et krav for sikker EPJ-integrasjon.
+
 Se: [Arkitekturoversikt](./arkitektur-oversikt.svg) | [Sekvensdiagram](./smart-launch-sekvens.svg) | [Nettverksruting](./nettverksruting.svg)
 
 ### 4.2 Autentisering — to separate lag
@@ -77,11 +79,11 @@ Disse to er **ikke** koblet — Altinn vet ikke om SMART-tokenet, og EPJ vet ikk
 ### 4.3 Dataflyt
 
 1. EPJ omdirigerer legens nettleser til `/smart/launch?iss=...&launch=...`
-2. Appen oppdager EPJs SMART-konfigurasjon (`/.well-known/smart-configuration`)
+2. Appen oppdager EPJs SMART-konfigurasjon (`/.well-known/smart-configuration` eller CapabilityStatement fra `GET /fhir/metadata`)
 3. PKCE-utfordring genereres; nettleser sendes til EPJs `/auth`-endepunkt
 4. EPJ utsteder autorisasjonskode; nettleser sendes til `/smart/callback`
 5. Appen veksler kode mot token **server-side** (POST til EPJs `/token`)
-6. Token + FHIR-kontekst (patientId, encounterId, fhirUser) lagres i server-session
+6. Token + FHIR-kontekst (patientId, encounterId, fhirUser) lagres i server-session. `fhirUser` leveres per SMART-spec som eget felt i tokenresponsen; noen EPJ-systemer returnerer det i stedet som JWT-claim i access_token
 7. Nettleser videresendes til Altinn-skjemaet
 8. Altinn-frontend henter datamodell → `IDataProcessor.ProcessDataRead` kalles
 9. `FhirPrefillService` leser session, kaller FHIR API, fyller ut datamodellen
@@ -189,3 +191,4 @@ Altinn options-fil: `options/kjoretoygrupper.json`
 | v0.4 | 2026-05 | SMART-flyt og sekvensdiagram |
 | v0.5 | 2026-06 | Sikkerhetskrav og kjøretøygrupper |
 | **v0.6** | **2026-06-15** | PoC-resultater innarbeidet. Kjente begrensninger dokumentert. SVG-diagrammer oppdatert. Nettverksruting lagt til. |
+| **v0.6.1** | **2026-06-15** | BFF-mønster presisert. CapabilityStatement lagt til i discovery-flyt. fhirUser-forbehold (JWT-claim vs. tokenfelt) innarbeidet. |

@@ -138,7 +138,9 @@ Veksler autorisasjonskode mot access token med SMART-spesifikke claims:
   "fhirUser": "http://172.30.80.1:8080/fhir/Practitioner/lege-ola"
 }
 ```
-`patient`, `encounter` og `fhirUser` er SMART-spesifikke felt som forteller appen hvilken kontekst som gjelder.
+`patient` og `encounter` er SMART-spesifikke felt som forteller appen hvilken kontekst som gjelder.
+
+`fhirUser` er definert i SMART App Launch IG v2.2.0 som et eget toppnivåfelt i tokenresponsen — og det er slik denne mocken returnerer det. **Merk:** Noen produksjons-EPJ-systemer returnerer `fhirUser` som en claim inne i `access_token` JWT-en (ikke som eget toppnivåfelt). Koden bør da dekode JWT-en server-side og lese ut `fhirUser`-claimet derfra. Se `SmartLaunchController.cs` → `TokenResponse.FhirUser`.
 
 #### `GET /fhir/*`
 Proxyer alle FHIR-kall videre til HAPI FHIR på `localhost:8080`. Brukes ikke av .NET-appen direkte (den går til HAPI direkte via `FhirBaseUrlOverride`), men nyttig for testing via nettleser.
