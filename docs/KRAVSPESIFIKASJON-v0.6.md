@@ -116,6 +116,7 @@ Disse to er **ikke** koblet — Altinn vet ikke om SMART-tokenet, og EPJ vet ikk
 | **Lege** | HPR-nummer | Practitioner.identifier | `urn:oid:2.16.578.1.12.4.1.4.4` |
 | | Fornavn | Practitioner.name[0].given[0] | — |
 | | Etternavn | Practitioner.name[0].family | — |
+| **Lege (foretrukket)** | HPR + organisasjon + rolle | PractitionerRole → Practitioner + Organization | — |
 | **Virksomhet** | Organisasjonsnummer | Organization.identifier | `urn:oid:2.16.578.1.12.4.1.4.101` |
 | | HER-id | Organization.identifier | `urn:oid:2.16.578.1.12.4.1.2` |
 | | Navn | Organization.name | — |
@@ -127,6 +128,8 @@ Disse to er **ikke** koblet — Altinn vet ikke om SMART-tokenet, og EPJ vet ikk
 | | Er skikket | (lege velger) | Boolean |
 | | Vilkår | (lege fyller ut) | Fritekst |
 | | Merknad | (lege fyller ut) | Fritekst |
+
+**Merknad om PractitionerRole:** NAV krever `no-basis-PractitionerRole` som obligatorisk ressurs for sin sykmeldingsapplikasjon (syk-inn). PractitionerRole kobler legen direkte til sin rolle og organisasjon, og er mer robust enn å hente organisasjon via `Encounter.serviceProvider`. PoC-en bruker Practitioner + Encounter-kjeden; for produksjon anbefales PractitionerRole som primærkilde.
 
 ### 5.2 Klassereferanse
 
@@ -190,6 +193,8 @@ SMART App Launch-spesifikasjonen standardiserer launch-flyt og autentisering —
 2. **Ressursfallback**: Hvis `Encounter` mangler i token — forsøk søk via `Patient/$everything` eller `Encounter?patient={id}&status=in-progress`
 3. **Profil-toleranse**: Ikke anta `identifier[0]` er fnr — søk etter OID `2.16.578.1.12.4.1.4.1` eksplisitt
 4. **Graceful degradation**: Manglende ressurser betyr tomme felt, ikke feil — legen fyller inn manuelt
+
+**NAVs sertifiseringsmodell:** NAV sertifiserer EPJ-er mot sine krav og vedlikeholder en liste over godkjente EPJ-systemer og versjoner. Applikasjonen sjekker ved oppstart om EPJ-et er sertifisert. Dette er et mønster Digdir/Helsedirektoratet bør vurdere for førerretterklæringen — alternativt å gjenbruke NAVs sertifiserte EPJ-liste som utgangspunkt.
 
 **Det viktigste arkitekturspørsmålet:** Hvilken konkret EPJ er første integrasjonsmål? Arkitekturen er moden nok — den største gjenværende risikoen er hva DIPS, CGM, Infodoc eller Pridok faktisk eksponerer av FHIR R4 i praksis.
 
@@ -307,7 +312,9 @@ Per 2026 finnes det **ingen nasjonal FHIR-profil for legeerklæring førerrett**
 
 ### Relaterte implementasjoner
 
-- **NAV syk-dig**: FHIR-basert sykmelding — mønster for norsk SMART on FHIR i helsesektor (https://github.com/navikt/syk-dig-backend)
+- **NAV syk-inn**: NAVs SMART on FHIR-applikasjon for ny digital sykmelding. Autoritært referansedokument for norsk SMART on FHIR mot EPJ-leverandører. Bruker samme arkitektur: BFF, konfidensielt klient, EHR Launch, server-side FHIR-kall.
+  - Krav til EPJ-leverandører: https://github.com/navikt/syk-inn/blob/main/docs/fhir/nav_requirements.md
+  - FHIR-ressursoversikt: https://github.com/navikt/syk-inn/blob/main/docs/fhir/_oversikt.md
 - **SMARTHealthIT**: Referanseimplementasjon og sandbox for SMART App Launch
 
 ---
@@ -324,3 +331,4 @@ Per 2026 finnes det **ingen nasjonal FHIR-profil for legeerklæring førerrett**
 | **v0.6** | **2026-06-15** | PoC-resultater innarbeidet. Kjente begrensninger dokumentert. SVG-diagrammer oppdatert. Nettverksruting lagt til. |
 | **v0.6.1** | **2026-06-15** | BFF-mønster presisert. CapabilityStatement lagt til i discovery-flyt. fhirUser-forbehold (JWT-claim vs. tokenfelt) innarbeidet. |
 | **v0.6.2** | **2026-06-15** | Eksplisitt MVP-avgrensning (seksjon 2.1). Scope governance og EPJ-variasjonstrategi (seksjon 6.2/6.4). SMART App Lifecycle (6.5). Nasjonal profilstrategi og HelseAPI/HelseID (seksjon 8). |
+| **v0.6.3** | **2026-06-16** | PractitionerRole lagt til som foretrukket FHIR-ressurs (seksjon 5.1). NAVs sertifiseringsmodell for EPJ dokumentert (seksjon 6.4). Referanser oppdatert med navikt/syk-inn. Kilde: NAV Standardiseringsutvalg møte 2-25. |

@@ -423,7 +423,7 @@ launch ??= _config["SmartOnFhir:DefaultLaunch"];
 _logger.LogInformation("ProcessDataRead called for instance {Id}", instance?.Id);
 ```
 
-### 7.7 FHIR URL-konstruksjon
+### 7.7 FHIR URL-konstruksjon og PractitionerRole
 
 Practitioner-URL fra SMART token (`fhirUser`) er en absolutt URL. Bruk den direkte:
 ```csharp
@@ -436,6 +436,15 @@ Organization-referanse i Encounter er relativ. Bygg absolutt URL:
 var orgUrl = orgRef.GetString();
 if (!orgUrl.StartsWith("http"))
     orgUrl = $"{ctx.FhirBaseUrl}/{orgUrl}";
+```
+
+**PractitionerRole (foretrukket i produksjon):** NAV krever `no-basis-PractitionerRole` som obligatorisk ressurs fordi den kobler legen direkte til organisasjon og rolle i én ressurs — mer robust enn `Encounter.serviceProvider`-kjeden. PoC-en bruker Practitioner + Encounter; i produksjon bør man forsøke PractitionerRole først:
+
+```csharp
+// Hent PractitionerRole med søk på practitioner-ID
+var prRoleUrl = $"{ctx.FhirBaseUrl}/PractitionerRole?practitioner={practitionerId}&_include=PractitionerRole:organization";
+var prRole = await TryGetFhirResource(client, prRoleUrl, "PractitionerRole");
+// Fallback: hent Organization via Encounter.serviceProvider som i dag
 ```
 
 ---
@@ -678,6 +687,6 @@ For testing mot SMARTHealthIT og Inferno: bruk syntetiske testpasienter fra [Syn
 
 | Kilde | Beskrivelse |
 |---|---|
-| NAV syk-dig / syfosmregler | FHIR-strukturering av sykmelding, norske diagnosekoder (ICD-10), Encounter/Condition-mønster |
+| NAV syk-inn (ny sykmelding) | Autoritært norsk referansedokument for SMART on FHIR mot EPJ. Krever PractitionerRole, Encounter, no-basis-profiler. Sertifiseringsmodell for EPJ-leverandører. Krav: https://github.com/navikt/syk-inn/blob/main/docs/fhir/nav_requirements.md |
 | DIPS Arena SMART-dokumentasjon | Referanseimplementasjon for norsk EPJ SMART Auth Server; struktur på `/.well-known/smart-configuration` |
 | SMARTHealthIT sandbox | Offentlig SMART-sandbox brukt for testing av OAuth-flyt og discovery |
