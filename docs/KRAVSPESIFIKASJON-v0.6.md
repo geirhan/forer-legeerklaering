@@ -181,7 +181,40 @@ Altinn options-fil: `options/kjoretoygrupper.json`
 
 ---
 
-## 8. Endringslogg
+## 8. Referanser
+
+### Standarder
+
+| Dokument | Versjon | URL |
+|---|---|---|
+| SMART App Launch Implementation Guide | v2.2.0 | https://hl7.org/fhir/smart-app-launch/ |
+| HL7 FHIR R4 | 4.0.1 | https://hl7.org/fhir/R4/ |
+| OAuth 2.0 (RFC 6749) | — | https://datatracker.ietf.org/doc/html/rfc6749 |
+| PKCE (RFC 7636) | — | https://datatracker.ietf.org/doc/html/rfc7636 |
+
+### Norske referanser
+
+| Dokument | URL |
+|---|---|
+| Norske FHIR-basisprofiler (no-basis R4) | https://hl7norway.github.io/basisprofil-no-R4/ |
+| Volven OID-register (fnr, HPR, orgnr, HER-id) | https://www.ehelse.no/kodeverk-og-terminologi/OID |
+| Norm for informasjonssikkerhet i helse og omsorg | https://www.ehelse.no/normen |
+
+### Altinn
+
+| Dokument | URL |
+|---|---|
+| Altinn Studio dokumentasjon | https://docs.altinn.studio/ |
+| app-localtest (lokalt testmiljø) | https://github.com/Altinn/app-localtest |
+
+### Relaterte implementasjoner
+
+- **NAV syk-dig**: FHIR-basert sykmelding — mønster for norsk SMART on FHIR i helsesektor (https://github.com/navikt/syk-dig-backend)
+- **SMARTHealthIT**: Referanseimplementasjon og sandbox for SMART App Launch
+
+---
+
+## 10. Endringslogg
 
 | Versjon | Dato | Endring |
 |---|---|---|

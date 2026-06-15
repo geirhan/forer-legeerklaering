@@ -455,3 +455,50 @@ public async Task<IActionResult> TestPrefill()
     // ...
 }
 ```
+
+---
+
+## 10. Referanser og inspirasjonskilder
+
+### Standarder og spesifikasjoner
+
+| Kilde | Beskrivelse | URL |
+|---|---|---|
+| SMART App Launch IG v2.2.0 | Primær spesifikasjon for SMART on FHIR EHR Launch, PKCE, scopes, token-parametre | https://hl7.org/fhir/smart-app-launch/ |
+| HL7 FHIR R4 | Ressursdefinisjoner: Patient, Practitioner, Organization, Encounter, Condition, DocumentReference | https://hl7.org/fhir/R4/ |
+| OAuth 2.0 RFC 6749 | Grunnleggende OAuth-flyt som SMART bygger på | https://datatracker.ietf.org/doc/html/rfc6749 |
+| PKCE RFC 7636 | Proof Key for Code Exchange — code_verifier + code_challenge (S256) | https://datatracker.ietf.org/doc/html/rfc7636 |
+
+### Norske FHIR-profiler og kodeverk
+
+| Kilde | Beskrivelse | URL |
+|---|---|---|
+| no-basis (HL7 Norway) | Norske basisprofiler for FHIR R4: NoBasisPatient, NoBasisPractitioner m.fl. | https://hl7norway.github.io/basisprofil-no-R4/ |
+| Volven / OID-register | Norske OID-er: fnr (`4.1`), HPR (`4.4`), orgnr (`4.101`), HER-id (`4.2`) | https://www.ehelse.no/kodeverk-og-terminologi/OID |
+| Norsk FHIR-profil sykmelding (NAV) | Mønster for FHIR-basert skjemautfylling i norsk helsesektor, SMART on FHIR EHR Launch, strukturering av Condition/Encounter-ressurser | https://github.com/navikt/syk-dig-backend |
+| FHIR4 NoBasisOrganization | HER-id og organisasjonsnummer i Organization.identifier | https://simplifier.net/hl7norwayno-basis |
+
+### Altinn
+
+| Kilde | Beskrivelse | URL |
+|---|---|---|
+| Altinn Studio dokumentasjon | IDataProcessor, datamodell, layout, options, deployment | https://docs.altinn.studio/ |
+| app-localtest | Lokalt testmiljø (docker-compose, nginx, Altinn Platform) | https://github.com/Altinn/app-localtest |
+| Altinn App API 8.6.4 | NuGet-pakker brukt i prosjektet (Altinn.App.Core, Altinn.App.Api) | https://www.nuget.org/packages/Altinn.App.Core |
+| Altinn Studio URL-parametere | Dokumentasjon om query params og prefill via URL | https://docs.altinn.studio/altinn-studio/reference/ux/fields/prefill/ |
+
+### Verktøy og biblioteker
+
+| Kilde | Beskrivelse | URL |
+|---|---|---|
+| HAPI FHIR | Åpen kildekode FHIR R4-server brukt som lokal EPJ-mock | https://hapifhir.io/ |
+| Express.js | Node.js-rammeverk for SMART Auth Mock | https://expressjs.com/ |
+| Podman / Podman Desktop | Rootless containermotor (erstatning for Docker Desktop) | https://podman.io/ |
+
+### Relaterte implementasjoner brukt som referanse
+
+| Kilde | Beskrivelse |
+|---|---|
+| NAV syk-dig / syfosmregler | FHIR-strukturering av sykmelding, norske diagnosekoder (ICD-10), Encounter/Condition-mønster |
+| DIPS Arena SMART-dokumentasjon | Referanseimplementasjon for norsk EPJ SMART Auth Server; struktur på `/.well-known/smart-configuration` |
+| SMARTHealthIT sandbox | Offentlig SMART-sandbox brukt for testing av OAuth-flyt og discovery |
