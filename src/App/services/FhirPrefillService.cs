@@ -104,34 +104,41 @@ namespace Altinn.App.Services
             await FillCondition(client, context, model);
         }
 
+        private async Task<JsonDocument> TryGetFhirResource(HttpClient client, string url, string resourceLabel)
+        {
+            try
+            {
+                var json = await client.GetStringAsync(url);
+                return JsonDocument.Parse(json);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to fetch FHIR resource {Label} from {Url}", resourceLabel, url);
+                return null;
+            }
+        }
+
         private async Task FillPatient(HttpClient client, FhirLaunchContext ctx, ForerLegeerklaeringModel model)
         {
             if (string.IsNullOrEmpty(ctx.PatientId))
                 return;
-            try
-            {
-                var url = $"{ctx.FhirBaseUrl}/Patient/{ctx.PatientId}";
-                var json = await client.GetStringAsync(url);
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
+            using var doc = await TryGetFhirResource(client, $"{ctx.FhirBaseUrl}/Patient/{ctx.PatientId}", "Patient");
+            if (doc == null)
+                return;
+            var root = doc.RootElement;
 
-                model.Pasient_Fnr = GetIdentifier(root, "urn:oid:2.16.578.1.12.4.1.4.1");
-                model.Pasient_Fodselsdato = root.TryGetProperty("birthDate", out var bd) ? bd.GetString() : null;
-                model.Pasient_Kjonn = root.TryGetProperty("gender", out var g) ? g.GetString() : null;
+            model.Pasient_Fnr = GetIdentifier(root, "urn:oid:2.16.578.1.12.4.1.4.1");
+            model.Pasient_Fodselsdato = root.TryGetProperty("birthDate", out var bd) ? bd.GetString() : null;
+            model.Pasient_Kjonn = root.TryGetProperty("gender", out var g) ? g.GetString() : null;
 
-                if (root.TryGetProperty("name", out var names) && names.GetArrayLength() > 0)
-                {
-                    var name = names[0];
-                    model.Pasient_Fornavn =
-                        name.TryGetProperty("given", out var given) && given.GetArrayLength() > 0
-                            ? given[0].GetString()
-                            : null;
-                    model.Pasient_Etternavn = name.TryGetProperty("family", out var family) ? family.GetString() : null;
-                }
-            }
-            catch (Exception ex)
+            if (root.TryGetProperty("name", out var names) && names.GetArrayLength() > 0)
             {
-                _logger.LogWarning(ex, "Failed to fetch Patient/{PatientId}", ctx.PatientId);
+                var name = names[0];
+                model.Pasient_Fornavn =
+                    name.TryGetProperty("given", out var given) && given.GetArrayLength() > 0
+                        ? given[0].GetString()
+                        : null;
+                model.Pasient_Etternavn = name.TryGetProperty("family", out var family) ? family.GetString() : null;
             }
         }
 
@@ -140,27 +147,58 @@ namespace Altinn.App.Services
             // fhirUser is a full URL reference to the Practitioner resource
             if (string.IsNullOrEmpty(ctx.FhirUser))
                 return;
-            try
+            using var doc = await TryGetFhirResource(client, ctx.FhirUser, "Practitioner");
+            if (doc == null)
+                return;
+            var root = doc.RootElement;
+
+            model.Lege_HPR = GetIdentifier(root, "urn:oid:2.16.578.1.12.4.1.4.4");
+
+            // B-4: Also try PractitionerRole to get organizational affiliation
+            var practitionerId = root.TryGetProperty("id", out var pid) ? pid.GetString() : null;
+            if (!string.IsNullOrEmpty(practitionerId))
+                await FillPractitionerRole(client, ctx, practitionerId, model);
+
+            if (root.TryGetProperty("name", out var names) && names.GetArrayLength() > 0)
             {
-                var json = await client.GetStringAsync(ctx.FhirUser);
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
-
-                model.Lege_HPR = GetIdentifier(root, "urn:oid:2.16.578.1.12.4.1.4.4");
-
-                if (root.TryGetProperty("name", out var names) && names.GetArrayLength() > 0)
-                {
-                    var name = names[0];
-                    model.Lege_Fornavn =
-                        name.TryGetProperty("given", out var given) && given.GetArrayLength() > 0
-                            ? given[0].GetString()
-                            : null;
-                    model.Lege_Etternavn = name.TryGetProperty("family", out var family) ? family.GetString() : null;
-                }
+                var name = names[0];
+                model.Lege_Fornavn =
+                    name.TryGetProperty("given", out var given) && given.GetArrayLength() > 0
+                        ? given[0].GetString()
+                        : null;
+                model.Lege_Etternavn = name.TryGetProperty("family", out var family) ? family.GetString() : null;
             }
-            catch (Exception ex)
+        }
+
+        private async Task FillPractitionerRole(
+            HttpClient client,
+            FhirLaunchContext ctx,
+            string practitionerId,
+            ForerLegeerklaeringModel model
+        )
+        {
+            var url = $"{ctx.FhirBaseUrl}/PractitionerRole?practitioner={practitionerId}&_count=1";
+            using var doc = await TryGetFhirResource(client, url, "PractitionerRole");
+            if (doc == null)
+                return;
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("entry", out var entries) || entries.GetArrayLength() == 0)
+                return;
+
+            var role = entries[0].GetProperty("resource");
+            if (
+                role.TryGetProperty("organization", out var orgRef)
+                && orgRef.TryGetProperty("reference", out var orgRefVal)
+            )
             {
-                _logger.LogWarning(ex, "Failed to fetch Practitioner from fhirUser: {FhirUser}", ctx.FhirUser);
+                var orgUrl = orgRefVal.GetString();
+                if (!string.IsNullOrEmpty(orgUrl))
+                {
+                    if (!orgUrl.StartsWith("http"))
+                        orgUrl = $"{ctx.FhirBaseUrl}/{orgUrl}";
+                    await FillOrganization(client, orgUrl, model);
+                }
             }
         }
 
@@ -172,86 +210,73 @@ namespace Altinn.App.Services
         {
             if (string.IsNullOrEmpty(ctx.EncounterId))
                 return;
-            try
-            {
-                var url = $"{ctx.FhirBaseUrl}/Encounter/{ctx.EncounterId}";
-                var json = await client.GetStringAsync(url);
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
+            using var doc = await TryGetFhirResource(
+                client,
+                $"{ctx.FhirBaseUrl}/Encounter/{ctx.EncounterId}",
+                "Encounter"
+            );
+            if (doc == null)
+                return;
+            var root = doc.RootElement;
 
-                // Konsultasjonsdato
-                if (root.TryGetProperty("period", out var period) && period.TryGetProperty("start", out var start))
-                    model.Konsultasjon_Dato = start.GetString();
+            // Konsultasjonsdato
+            if (root.TryGetProperty("period", out var period) && period.TryGetProperty("start", out var start))
+                model.Konsultasjon_Dato = start.GetString();
 
-                // Organization via serviceProvider
-                if (
-                    root.TryGetProperty("serviceProvider", out var sp) && sp.TryGetProperty("reference", out var orgRef)
-                )
-                {
-                    var orgUrl = orgRef.GetString();
-                    if (!orgUrl.StartsWith("http"))
-                        orgUrl = $"{ctx.FhirBaseUrl}/{orgUrl}";
-                    await FillOrganization(client, orgUrl, model);
-                }
-            }
-            catch (Exception ex)
+            // Fall back to Encounter.serviceProvider for org if PractitionerRole lookup didn't populate it
+            if (
+                string.IsNullOrEmpty(model.Virksomhet_Navn)
+                && root.TryGetProperty("serviceProvider", out var sp)
+                && sp.TryGetProperty("reference", out var orgRef)
+            )
             {
-                _logger.LogWarning(ex, "Failed to fetch Encounter/{EncounterId}", ctx.EncounterId);
+                var orgUrl = orgRef.GetString();
+                if (!orgUrl.StartsWith("http"))
+                    orgUrl = $"{ctx.FhirBaseUrl}/{orgUrl}";
+                await FillOrganization(client, orgUrl, model);
             }
         }
 
         private async Task FillOrganization(HttpClient client, string orgUrl, ForerLegeerklaeringModel model)
         {
-            try
-            {
-                var json = await client.GetStringAsync(orgUrl);
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
+            using var doc = await TryGetFhirResource(client, orgUrl, "Organization");
+            if (doc == null)
+                return;
+            var root = doc.RootElement;
 
-                model.Virksomhet_Orgnr = GetIdentifier(root, "urn:oid:2.16.578.1.12.4.1.4.101");
-                model.Virksomhet_HerId = GetIdentifier(root, "urn:oid:2.16.578.1.12.4.1.2");
-                model.Virksomhet_Navn = root.TryGetProperty("name", out var name) ? name.GetString() : null;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to fetch Organization from {OrgUrl}", orgUrl);
-            }
+            model.Virksomhet_Orgnr = GetIdentifier(root, "urn:oid:2.16.578.1.12.4.1.4.101");
+            model.Virksomhet_HerId = GetIdentifier(root, "urn:oid:2.16.578.1.12.4.1.2");
+            model.Virksomhet_Navn = root.TryGetProperty("name", out var name) ? name.GetString() : null;
         }
 
         private async Task FillCondition(HttpClient client, FhirLaunchContext ctx, ForerLegeerklaeringModel model)
         {
             if (string.IsNullOrEmpty(ctx.PatientId))
                 return;
-            try
+
+            var url =
+                $"{ctx.FhirBaseUrl}/Condition?patient={ctx.PatientId}&clinical-status=active&_sort=-recorded-date&_count=1";
+            if (!string.IsNullOrEmpty(ctx.EncounterId))
+                url += $"&encounter={ctx.EncounterId}";
+
+            using var doc = await TryGetFhirResource(client, url, "Condition");
+            if (doc == null)
+                return;
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("entry", out var entries) || entries.GetArrayLength() == 0)
+                return;
+
+            var condition = entries[0].GetProperty("resource");
+            if (
+                condition.TryGetProperty("code", out var code)
+                && code.TryGetProperty("coding", out var codings)
+                && codings.GetArrayLength() > 0
+            )
             {
-                // Fetch the most recent active condition for this patient/encounter
-                var url =
-                    $"{ctx.FhirBaseUrl}/Condition?patient={ctx.PatientId}&clinical-status=active&_sort=-recorded-date&_count=1";
-                if (!string.IsNullOrEmpty(ctx.EncounterId))
-                    url += $"&encounter={ctx.EncounterId}";
-
-                var json = await client.GetStringAsync(url);
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
-
-                if (!root.TryGetProperty("entry", out var entries) || entries.GetArrayLength() == 0)
-                    return;
-
-                var condition = entries[0].GetProperty("resource");
-                if (
-                    condition.TryGetProperty("code", out var code)
-                    && code.TryGetProperty("coding", out var codings)
-                    && codings.GetArrayLength() > 0
-                )
-                {
-                    var coding = codings[0];
-                    model.Diagnose_Kode = coding.TryGetProperty("code", out var c) ? c.GetString() : null;
-                    model.Diagnose_Tekst = coding.TryGetProperty("display", out var d) ? d.GetString() : null;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to fetch Condition for patient {PatientId}", ctx.PatientId);
+                var coding = codings[0];
+                model.Diagnose_Kode = coding.TryGetProperty("code", out var c) ? c.GetString() : null;
+                model.Diagnose_Tekst = coding.TryGetProperty("display", out var d) ? d.GetString() : null;
             }
         }
 

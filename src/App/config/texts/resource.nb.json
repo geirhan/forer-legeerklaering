@@ -9,6 +9,7 @@
     { "id": "field.pasient.fornavn", "value": "Fornavn" },
     { "id": "field.pasient.etternavn", "value": "Etternavn" },
     { "id": "field.pasient.fodselsdato", "value": "Fødselsdato" },
+    { "id": "field.pasient.kjonn", "value": "Kjønn" },
 
     { "id": "header.lege", "value": "Utstedende lege" },
     { "id": "field.lege.fornavn", "value": "Fornavn" },

@@ -36,6 +36,18 @@
       "validationErrorOnPendingFileScan": false,
       "enabledFileAnalysers": [],
       "enabledFileValidators": []
+    },
+    {
+      "id": "signatur",
+      "allowedContentTypes": ["application/json"],
+      "taskId": "Task_2",
+      "maxCount": 1,
+      "minCount": 1,
+      "enablePdfCreation": false,
+      "enableFileScan": false,
+      "validationErrorOnPendingFileScan": false,
+      "enabledFileAnalysers": [],
+      "enabledFileValidators": []
     }
   ],
   "partyTypesAllowed": {

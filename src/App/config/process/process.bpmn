@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <bpmn:definitions id="Altinn_SingleDataTask_Process_Definition" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:altinn="http://altinn.no/process" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" targetNamespace="http://bpmn.io/schema/bpmn">
   <bpmn:process id="SingleDataTask" isExecutable="false">
     <bpmn:startEvent id="StartEvent_1">
@@ -6,18 +6,38 @@
     </bpmn:startEvent>
     <bpmn:task id="Task_1" name="Utfylling">
       <bpmn:incoming>SequenceFlow_1n56yn5</bpmn:incoming>
-      <bpmn:outgoing>SequenceFlow_1oot28q</bpmn:outgoing>
+      <bpmn:outgoing>SequenceFlow_1to2</bpmn:outgoing>
       <bpmn:extensionElements>
         <altinn:taskExtension>
           <altinn:taskType>data</altinn:taskType>
         </altinn:taskExtension>
       </bpmn:extensionElements>
     </bpmn:task>
+    <bpmn:task id="Task_2" name="Signering">
+      <bpmn:incoming>SequenceFlow_1to2</bpmn:incoming>
+      <bpmn:outgoing>SequenceFlow_2toEnd</bpmn:outgoing>
+      <bpmn:extensionElements>
+        <altinn:taskExtension>
+          <altinn:taskType>signing</altinn:taskType>
+          <altinn:actions>
+            <altinn:action>sign</altinn:action>
+            <altinn:action>reject</altinn:action>
+          </altinn:actions>
+          <altinn:signatureConfig>
+            <altinn:dataTypesToSign>
+              <altinn:dataType>ForerLegeerklaering</altinn:dataType>
+            </altinn:dataTypesToSign>
+            <altinn:signatureDataType>signatur</altinn:signatureDataType>
+          </altinn:signatureConfig>
+        </altinn:taskExtension>
+      </bpmn:extensionElements>
+    </bpmn:task>
     <bpmn:endEvent id="EndEvent_1">
-      <bpmn:incoming>SequenceFlow_1oot28q</bpmn:incoming>
+      <bpmn:incoming>SequenceFlow_2toEnd</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="SequenceFlow_1n56yn5" sourceRef="StartEvent_1" targetRef="Task_1" />
-    <bpmn:sequenceFlow id="SequenceFlow_1oot28q" sourceRef="Task_1" targetRef="EndEvent_1" />
+    <bpmn:sequenceFlow id="SequenceFlow_1to2" sourceRef="Task_1" targetRef="Task_2" />
+    <bpmn:sequenceFlow id="SequenceFlow_2toEnd" sourceRef="Task_2" targetRef="EndEvent_1" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="SingleDataTask">
@@ -25,18 +45,25 @@
         <dc:Bounds x="156" y="81" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_1_di" bpmnElement="Task_1">
-        <dc:Bounds x="300" y="59" width="100" height="80" />
+        <dc:Bounds x="260" y="59" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_2_di" bpmnElement="Task_2">
+        <dc:Bounds x="430" y="59" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
-        <dc:Bounds x="512" y="81" width="36" height="36" />
+        <dc:Bounds x="612" y="81" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="SequenceFlow_1n56yn5_di" bpmnElement="SequenceFlow_1n56yn5">
         <di:waypoint x="192" y="99" />
-        <di:waypoint x="300" y="99" />
+        <di:waypoint x="260" y="99" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="SequenceFlow_1oot28q_di" bpmnElement="SequenceFlow_1oot28q">
-        <di:waypoint x="400" y="99" />
-        <di:waypoint x="512" y="99" />
+      <bpmndi:BPMNEdge id="SequenceFlow_1to2_di" bpmnElement="SequenceFlow_1to2">
+        <di:waypoint x="360" y="99" />
+        <di:waypoint x="430" y="99" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="SequenceFlow_2toEnd_di" bpmnElement="SequenceFlow_2toEnd">
+        <di:waypoint x="530" y="99" />
+        <di:waypoint x="612" y="99" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

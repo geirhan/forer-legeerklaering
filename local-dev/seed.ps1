@@ -38,7 +38,10 @@ Put-Resource "Patient" "sophie-salt" @{
 Put-Resource "Practitioner" "lege-ola" @{
     resourceType = "Practitioner"
     id = "lege-ola"
-    identifier = @(@{ system = "urn:oid:2.16.578.1.12.4.1.4.4"; value = "1234567" })
+    identifier = @(
+        @{ system = "urn:oid:2.16.578.1.12.4.1.4.4"; value = "1234567" },
+        @{ system = "urn:oid:2.16.578.1.12.4.1.4.1"; value = "01017512345" }
+    )
     name = @(@{ family = "Nordmann"; given = @("Ola") })
 }
 

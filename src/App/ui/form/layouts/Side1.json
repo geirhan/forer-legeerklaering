@@ -38,6 +38,13 @@
         "textResourceBindings": { "title": "field.pasient.fodselsdato" }
       },
       {
+        "id": "Pasient_Kjonn",
+        "type": "Input",
+        "dataModelBindings": { "simpleBinding": "Pasient_Kjonn" },
+        "readOnly": true,
+        "textResourceBindings": { "title": "field.pasient.kjonn" }
+      },
+      {
         "id": "header-lege",
         "type": "Header",
         "size": "L",

@@ -8,10 +8,12 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Altinn.App.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Altinn.App.Controllers
@@ -33,6 +35,7 @@ namespace Altinn.App.Controllers
         private readonly IConfiguration _config;
         private readonly IMemoryCache _memoryCache;
         private readonly ILogger<SmartLaunchController> _logger;
+        private readonly IWebHostEnvironment _env;
 
         private const string StateSessionKey = "smart_state";
         private const string PkceSessionKey = "smart_pkce_verifier";
@@ -44,13 +47,15 @@ namespace Altinn.App.Controllers
             IHttpClientFactory httpClientFactory,
             IConfiguration config,
             IMemoryCache memoryCache,
-            ILogger<SmartLaunchController> logger
+            ILogger<SmartLaunchController> logger,
+            IWebHostEnvironment env
         )
         {
             _httpClientFactory = httpClientFactory;
             _config = config;
             _memoryCache = memoryCache;
             _logger = logger;
+            _env = env;
         }
 
         /// <summary>
@@ -66,9 +71,12 @@ namespace Altinn.App.Controllers
             if (string.IsNullOrEmpty(iss) || string.IsNullOrEmpty(launch))
                 return BadRequest("Missing required SMART launch parameters: iss, launch");
 
-            // Validate iss against allowlist
+            // Validate iss against allowlist — fail-closed in production
             var allowedIssList = _config.GetSection("SmartOnFhir:AllowedIssuerList").Get<List<string>>() ?? new();
-            if (allowedIssList.Count > 0 && !allowedIssList.Contains(iss))
+            var isAllowed = _env.IsDevelopment()
+                ? (allowedIssList.Count == 0 || allowedIssList.Contains(iss))
+                : (allowedIssList.Count > 0 && allowedIssList.Contains(iss));
+            if (!isAllowed)
             {
                 _logger.LogWarning("Rejected SMART launch from unlisted iss: {Iss}", iss);
                 return Forbid();
@@ -127,7 +135,8 @@ namespace Altinn.App.Controllers
                 scopes,
                 state,
                 codeChallenge,
-                launch
+                launch,
+                iss
             );
 
             return Redirect(authUrl);
@@ -135,12 +144,15 @@ namespace Altinn.App.Controllers
 
         /// <summary>
         /// Test-only shortcut: bypasses OAuth and seeds session directly with mock FHIR context.
-        /// Only active when SmartOnFhir:DefaultIss is configured.
+        /// Only active in Development environment and when SmartOnFhir:FhirBaseUrlOverride is configured.
         /// Usage: GET /{org}/{app}/smart/test-prefill
         /// </summary>
         [HttpGet("test-prefill")]
         public async Task<IActionResult> TestPrefill()
         {
+            if (!_env.IsDevelopment())
+                return NotFound();
+
             var fhirBase = _config["SmartOnFhir:FhirBaseUrlOverride"];
             if (string.IsNullOrEmpty(fhirBase))
                 return BadRequest("SmartOnFhir:FhirBaseUrlOverride ikke konfigurert");
@@ -317,9 +329,12 @@ namespace Altinn.App.Controllers
             string scope,
             string state,
             string codeChallenge,
-            string launch
+            string launch,
+            string iss
         )
         {
+            // aud must be the FHIR server base URL (iss), NOT the authorization endpoint
+            // per SMART App Launch IG v2.2.0 §3.1
             var qs = new Dictionary<string, string>
             {
                 ["response_type"] = "code",
@@ -327,7 +342,7 @@ namespace Altinn.App.Controllers
                 ["redirect_uri"] = redirectUri ?? "",
                 ["scope"] = scope ?? "",
                 ["state"] = state ?? "",
-                ["aud"] = authEndpoint ?? "",
+                ["aud"] = iss ?? "",
                 ["launch"] = launch ?? "",
                 ["code_challenge"] = codeChallenge ?? "",
                 ["code_challenge_method"] = "S256",
@@ -368,6 +383,7 @@ namespace Altinn.App.Controllers
             public string RefreshToken { get; set; }
             public string Patient { get; set; }
             public string Encounter { get; set; }
+
             // Per SMART App Launch IG v2.2.0: fhirUser er et eget toppnivåfelt i tokenresponsen.
             // Noen EPJ-systemer returnerer det som JWT-claim i access_token i stedet — dekod da tokenet server-side.
             public string FhirUser { get; set; }

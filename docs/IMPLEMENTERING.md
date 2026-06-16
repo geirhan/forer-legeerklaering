@@ -86,7 +86,7 @@ hapi_fhir:
 
 Synkroniseringsnøkkelen er fødselsnummeret: samme fnr må finnes i Altinn Local Tests profilfil (`testdata/Profile/User/12345.json`) og i FHIR Practitioner-ressursens `identifier`-liste.
 
-Testdata lastes inn via `fhir-testdata/seed.ps1`. Scriptet bruker HTTP PUT for å opprette ressurser med kjente ID-er:
+Testdata lastes inn via `local-dev/seed.ps1`. Scriptet bruker HTTP PUT for å opprette ressurser med kjente ID-er:
 
 | Ressurs | ID | Innhold |
 |---|---|---|
@@ -99,7 +99,7 @@ Testdata lastes inn via `fhir-testdata/seed.ps1`. Scriptet bruker HTTP PUT for �
 
 Kjør seedingen:
 ```powershell
-cd C:\Users\jsf\source\app-localtest\fhir-testdata
+cd local-dev
 .\seed.ps1
 ```
 
@@ -121,7 +121,7 @@ En Node.js/Express-server som simulerer EPJ-systemets SMART autorisasjonsserver.
 
 ### Hvor det kjøres
 ```
-Sti:  app-localtest/fhir-testdata/smart-mock/server.js
+Sti:  local-dev/smart-mock/server.js
 Port: 9090 (Windows)
 Start: node server.js
 ```
@@ -175,7 +175,7 @@ const HOST_IP = "172.30.80.1";              // Windows-host sett fra containere
 
 ### Avhengigheter
 ```bash
-cd app-localtest/fhir-testdata/smart-mock
+cd local-dev/smart-mock
 npm install    # express, http-proxy-middleware
 node server.js
 ```
