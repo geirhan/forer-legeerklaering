@@ -54,6 +54,7 @@ Etablerer et mønster som kan gjenbrukes for andre helseskjemaer: sykmelding, he
 | [SKJEMA-IS2569.md](docs/SKJEMA-IS2569.md) | Fullstendig feltstruktur for blankett IS-2569 (Helseattest førerett) med implementeringsstatus |
 | [PASIENTFLYT.md](docs/PASIENTFLYT.md) | Arkitekturforslag for digital egenerklæring (NA-0201) med Dialogporten og helsenorge.no — pasientens del av flyten |
 | [BESLUTNINGER.md](docs/BESLUTNINGER.md) | Åpne beslutninger som krever menneskelig avklaring: autorisasjonsmodell, HelseID-validering, mottaksarkitektur, DPIA, full IS-2569 |
+| [VEIKART.md](docs/VEIKART.md) | Prioritert veikart mot produksjonsklar referansearkitektur: fase 1–5 inkl. NuGet-pakke `Digdir.SmartOnFhir` |
 
 ---
 
