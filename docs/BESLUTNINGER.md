@@ -25,7 +25,7 @@ En Altinn-instans har alltid én «part» (party) som eier instansen. I dag star
 
 ## C-2: HelseID — når skal BFF-siden validere tokenet?
 
-**Problemstilling:**  
+**Problemstilling:**  <!-- KOMMENTAR: Mulig jeg missforstår, men jeg forvanter at DelseID-tokenet må valideres før det mappes til et Altinn-internt token.   -->
 I dag stoler BFF-en (ASP.NET Core) på access token fra SMART-mock uten å validere signaturen. I produksjon med HelseID må tokenet valideres. Spørsmålet er *når* dette skal innføres og *hva* som kreves:
 
 - JWT Bearer-validering mot HelseID sitt JWKS-endepunkt
@@ -56,7 +56,7 @@ Når legen sender inn erklæringen, hvor skal den ende opp?
 | Alternativ | Beskrivelse | Avhengigheter |
 |---|---|---|
 | **A — Digdir (nåværende)** | Digdir eier tjenesten, tar imot via Altinn storage | Ingen nye avtaler. Men Digdir er ikke naturlig mottaker av helseerklæringer. |
-| **B — Statens vegvesen** | SVV som tjenesteeier og mottaker | Krever avtale med SVV, integrasjon mot SVVs systemer. Riktig juridisk mottaker. |
+| **B — Statens vegvesen** | SVV som tjenesteeier og mottaker | Krever avtale med SVV, integrasjon mot SVVs systemer. Riktig juridisk mottaker. <!-- KOMMENTAR: For Førerrets tjenesten, er det Statens vegvesen som må være tjenesteeier. Det er de som har ansvaret for å utstede førrerett --> |
 | **C — Helsedirektoratet** | Hdir som nasjonal koordinator | Krever avtale og API-integrasjon. |
 | **D — EPJ (DocumentReference)** | Erklæringen skrives tilbake til pasientjournalen | Krever FHIR `DocumentReference` writeback til EPJ etter innsending. |
 

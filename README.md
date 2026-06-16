@@ -22,7 +22,7 @@ EPJ-system ──SMART EHR Launch──► Altinn App (BFF)
                                       └─► Altinn Platform (signering, arkiv, PDF)
 ```
 
-Etablerer et mønster som kan gjenbrukes for andre helseskjemaer: sykmelding, henvisninger, attester.
+Etablerer et mønster som kan gjenbrukes for andre helseskjemaer: sykmelding <!-- KOMMENTAR: Dette er løst av NAV allerede, og de har allerde ettablert et mønster for det. -->, henvisninger, attester.
 
 ---
 
