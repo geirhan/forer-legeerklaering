@@ -420,11 +420,11 @@
 
   function doLaunch() {
     const url = `${ALTINN_BASE}/${state.org}/${state.app}/smart/launch?iss=${encodeURIComponent(ISS)}&launch=${encodeURIComponent(state.launch)}`;
-    window.location.href = url;
+    window.open(url, '_blank');
   }
 
   function doTestPrefill() {
-    window.location.href = `${ALTINN_BASE}/${state.org}/${state.app}/smart/test-prefill`;
+    window.open(`${ALTINN_BASE}/${state.org}/${state.app}/smart/test-prefill`, '_blank');
   }
 </script>
 
